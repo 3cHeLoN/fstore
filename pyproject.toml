@@ -1,0 +1,55 @@
+[project]
+name = "fstore"
+description = "The easy archival tool."
+version = "0.1"
+authors = [
+    { name = "Folkert Bleichrodt" },
+]
+
+dependencies = [
+  ]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+fstore = "fstore.scripts.archive:main"
+
+[tool.pylint.main]
+extension-pkg-allow-list="PySide6"
+
+[tool.pylint.messages_control]
+disable=[
+    "too-many-locals",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-public-methods",
+    "too-many-lines",
+    "too-few-public-methods",
+    "fixme",
+    "duplicate-code",
+]
+
+[tool.ruff.lint]
+extend-select = ["ANN", "B", "D", "E", "F",  "I"]
+ignore = ["ANN401"]
+pydocstyle.convention = "google"
+
+[tool.tox]
+envlist = ["py313"]
+
+[tool.tox.env.py313]
+deps = [
+    "pytest",
+    "pylint",
+    "ruff",
+    "applus_devops_pipelines"
+]
+commands = [
+    ["pytest", "--maxfail=1"],
+    ["pylint", "src", "scripts", "tests"],
+    ["ruff", "check"],
+    ["ruff", "format", "--check"],
+]
