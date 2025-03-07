@@ -1,7 +1,9 @@
 import argparse
 import logging
+import os
 import pathlib
 from itertools import chain
+from typing import Generator
 
 from fstore.exceptions import UnsupportedExtension, UnsupportedOperation
 from fstore.operations import (
@@ -10,7 +12,7 @@ from fstore.operations import (
     FileOperation,
     perform_operations,
 )
-from fstore.scan import scan_files
+from fstore.scan import scan_files_fast
 from fstore.util import (
     collect_additional_files,
     get_exif_date,
@@ -36,7 +38,7 @@ def main() -> None:
     parser.add_argument(
         "--extensions",
         type=str,
-        default=".jpg,.png,.bmp",
+        default=".jpg,.png",
         required=False,
         help="The comma-separated list of image extensions to include.",
     )
@@ -62,7 +64,10 @@ def main() -> None:
                 f"The extension `{ext}` is not supported by pillow."
             )
 
-    file_list = chain(*[scan_files(args.input_folder, ext) for ext in extensions])
+    # file_list = chain(*[scan_files(args.input_folder, ext) for ext in extensions])
+    file_list = chain(
+        *[scan_files_fast(args.input_folder.as_posix(), ext) for ext in extensions]
+    )
 
     skipped_set = set()
     collected_set = set()
@@ -72,11 +77,12 @@ def main() -> None:
 
         year, month, day = get_exif_date(filename)
         if year is None or month is None or day is None:
-            logging.warn("Skipping file %s", filename.as_posix())
+            logging.warning("Skipping file %s", filename)
             skipped_set.add(filename)
             continue
 
-        target_folder = args.output_folder / str(year) / str(month)
+        target_folder = os.path.join(args.output_folder, str(year), str(month))
+        # target_folder = args.output_folder / str(year) / str(month)
         include_files_in_collection(
             collection=collected_set,
             include_set=file_set,
@@ -94,8 +100,8 @@ def main() -> None:
 
 def include_files_in_collection(
     collection: set[DataOperation],
-    include_set: set[pathlib.Path],
-    output_folder: pathlib.Path,
+    include_set: Generator[str],
+    output_folder: str,
     operation: FileOperation = FileOperation.DRYRUN,
 ) -> None:
     """Add files to the collection.
@@ -107,7 +113,8 @@ def include_files_in_collection(
         operation: The file operation to perform.
     """
     for filename in include_set:
-        target_file = output_folder / filename.name
+        file_base = os.path.basename(filename)
+        target_file = os.path.join(output_folder, file_base)
         logging.info("Located file %s.", filename)
         collection.add(DataOperation(filename, target_file, operation))
 

@@ -1,4 +1,7 @@
+import logging
+import os
 import pathlib
+from typing import Generator
 
 from PIL import Image
 from PIL.ExifTags import TAGS
@@ -28,7 +31,21 @@ def get_exif_date(
                     # Extract the date and time
                     date_time_str = value
                     # Split the date and time string
-                    date_part, time_part = date_time_str.split(" ")
+                    date_time_parts = date_time_str.split(" ")
+                    if len(date_time_parts) != 2:
+                        logging.warning(
+                            "The exif DateTimeOriginal does not contain both date and time."
+                        )
+                        continue
+
+                    date_part, time_part = date_time_parts
+
+                    date_parts = date_part.split(":")
+                    if len(date_parts) != 3:
+                        logging.warning(
+                            "The exif DateTimeOriginal does not contain a valid date."
+                        )
+                        continue
                     year, month, day = date_part.split(":")
                     return int(year), int(month), int(day)
 
@@ -45,7 +62,7 @@ def get_supported_extensions() -> list[str]:
     return list(Image.registered_extensions().keys())
 
 
-def collect_additional_files(filename: pathlib.Path) -> set[pathlib.Path]:
+def collect_additional_files(filename: str) -> Generator:
     """Collect other files with the same stem.
 
     Args:
@@ -54,4 +71,9 @@ def collect_additional_files(filename: pathlib.Path) -> set[pathlib.Path]:
     Returns:
         A list of all obtained files.
     """
-    return set(filename.parent.glob(filename.stem + "*"))
+    file_base = os.path.basename(filename).split(".")[0]
+    parent = os.path.dirname(filename)
+    results = os.scandir(parent)
+    for result in results:
+        if result.name.startswith(file_base):
+            yield result.path

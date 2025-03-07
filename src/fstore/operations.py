@@ -1,7 +1,7 @@
 """Copy utilities."""
 
 import logging
-import pathlib
+import os
 import shutil
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -29,8 +29,8 @@ class FileOperation(Enum):
 class DataOperation:
     """Represents a file operation."""
 
-    input_file: pathlib.Path
-    output_file: pathlib.Path
+    input_file: str
+    output_file: str
     type: FileOperation
 
 
@@ -41,7 +41,7 @@ OPERATION_FROM_STR = {
 }
 
 
-def get_file_hash(filename: pathlib.Path) -> str:
+def get_file_hash(filename: str) -> str:
     """Obtain a file hash.
 
     Args:
@@ -50,12 +50,12 @@ def get_file_hash(filename: pathlib.Path) -> str:
     Returns:
         Its hash.
     """
-    with filename.open(mode="rb") as f:
+    with open(filename, mode="rb") as f:
         checksum = xxhash.xxh3_64_hexdigest(f.read())
     return checksum
 
 
-def assert_safe_copy(src: pathlib.Path, dst: pathlib.Path) -> FileCompare:
+def assert_safe_copy(src: str, dst: str) -> FileCompare:
     """Assert whether the copy operation is safe.
 
     Args:
@@ -65,7 +65,7 @@ def assert_safe_copy(src: pathlib.Path, dst: pathlib.Path) -> FileCompare:
     Returns:
         Whether the operation can be safely performed.
     """
-    if not dst.exists():
+    if not os.path.exists(dst):
         return FileCompare.NEW
 
     src_hash = get_file_hash(src)
@@ -90,8 +90,8 @@ def perform_operations(data_operation_set: set[DataOperation]) -> set[DataOperat
         logging.info(
             "Performing operation %s from %s to %s.",
             str(data_operation.type),
-            data_operation.input_file.as_posix(),
-            data_operation.output_file.as_posix(),
+            data_operation.input_file,
+            data_operation.output_file,
         )
         files_status = assert_safe_copy(
             src=data_operation.input_file, dst=data_operation.output_file
@@ -100,7 +100,7 @@ def perform_operations(data_operation_set: set[DataOperation]) -> set[DataOperat
         if files_status == FileCompare.SAME:
             logging.info(
                 "Duplicate exact copy detected at destination %s, SKIPPING",
-                data_operation.output_file.as_posix(),
+                data_operation.output_file,
             )
         elif files_status == FileCompare.DIFFERENT:
             logging.warning(
@@ -108,21 +108,21 @@ def perform_operations(data_operation_set: set[DataOperation]) -> set[DataOperat
                     "Duplicate file detected at destination %s,"
                     " but target is different, SKIPPING"
                 ),
-                data_operation.output_file.as_posix(),
+                data_operation.output_file,
             )
             missed_operations.add(data_operation)
         elif files_status == FileCompare.NEW:
             logging.info(
                 "Copying file %s to %s.",
-                data_operation.input_file.as_posix(),
-                data_operation.output_file.as_posix(),
+                data_operation.input_file,
+                data_operation.output_file,
             )
 
             if data_operation.type == FileOperation.COPY:
                 # Create folder structure if needed:
-                output_folder = data_operation.output_file.parent
-                if not output_folder.exists():
-                    output_folder.mkdir(parents=True, exist_ok=False)
+                output_folder = os.path.dirname(data_operation.output_file)
+                if not os.path.exists(output_folder):
+                    os.makedirs(output_folder)
 
                 shutil.copy2(
                     src=data_operation.input_file, dst=data_operation.output_file
